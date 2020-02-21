@@ -1,11 +1,16 @@
-const AWS = require("/AWS")
-const topicARN = "arn:aws:sns:us-east-1:962378977114:Compra"
+const AWS = require("./AWS")
 
-function sendTopic(message){
+function sendTopic(message, distributor, topicArn) {
   // Create publish parameters
   var params = {
-    Message: message, /* required */
-    TopicArn: topicARN
+    Message: JSON.stringify(message), /* required */
+    MessageAttributes: {
+      'distributor': {
+        DataType: 'String', /* required */
+        StringValue: distributor
+      },
+    },
+    TopicArn: topicArn
   };
 
   // Create promise and SNS service object
@@ -15,6 +20,4 @@ function sendTopic(message){
   return publishTextPromise
 }
 
-module.exports = {
-  sendTopic: sendTopic
-}
+module.exports = sendTopic

@@ -1,54 +1,80 @@
-var createError = require('http-errors');
-var express = require('express');
-var path = require('path');
-var cookieParser = require('cookie-parser');
-var logger = require('morgan');
-var AWS = require('./AWS');
-var indexRouter = require('./routes/index');
-var usersRouter = require('./routes/users');
-var app = express();
-
-// view engine setup
-app.set('views', path.join(__dirname, 'views'));
+const createError = require('http-errors');
+const express = require('express');
+const chalk = require('chalk');
+const cookieParser = require('cookie-parser');
+const logger = require('morgan');
+const AWS = require('./AWS');
+const orderRouter = require('./routes/orderRouter');
+const app = express();
+const sqsConsumer = require('./sqsConsumer');
 
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
 
-app.use('/', indexRouter);
-app.use('/users', usersRouter);
+app.use('/order', orderRouter);
 
-// catch 404 and forward to error handler
-app.use(function(req, res, next) {
+app.use((req, res, next) => {
   next(createError(404));
 });
 
-// error handler
-app.use(function(err, req, res, next) {
-  // set locals, only providing error in development
+/**
+ * Error handler
+ */
+app.use((err, req, res) => {
   res.locals.message = err.message;
   res.locals.error = req.app.get('env') === 'development' ? err : {};
-
-  // render the error page
   res.status(err.status || 500);
-  res.render('error');
+  res.json({error: 'error'});
 });
 
-function messageReciever(d){
-  console.log("reciever",d)
+/**
+ * Función para recibir tus propias órdenes de compra y despacharlas
+ * a la cadena de envío, debe verificar si la orden es para sí mismo, si no,
+ * debe enviarla a otro distribuidor
+ * 
+ * TIP: Usar la función de chaoticShipping para enviar el paquete de manera aleatoria
+ * @param {*} payload 
+ */
+function purchaseReceiver(payload) {
+  console.log(chalk.yellow("Mensaje recibido:"), payload);
+  const order = JSON.parse(payload.body); 
+  console.log('Estamos preparando su producto para enviarlo a donde lo solicitó');
+  //Realizar lógica aquí
 }
-var queueSub = require('./sqsConsumer')(messageReciever).app
-queueSub.on('error', (err) => {
+
+/**
+ * Función para recibir un paquete que no es para ti
+ * @param {*} payload 
+ */
+function chaoticShipping(payload) {
+  // Escribir aquí la función para enviar de manera aleatoria a alguna cola
+  // Países disponibles: ['espana', 'ecuador', 'japon', 'usa', 'noruega', 'china']
+}
+
+
+const purchaseQueue = 'https://sqs.us-east-1.amazonaws.com/962378977114/COMPRA-USA'
+const deliveryQueue = 'https://sqs.us-east-1.amazonaws.com/962378977114/SEND_USA';
+const purchaseConsumer = sqsConsumer(purchaseReceiver, purchaseQueue);
+const deliveryConsumer = sqsConsumer(chaoticShipping, deliveryQueue);
+
+purchaseConsumer.on('error', (err) => {
+  console.error(err.message);
+});
+deliveryConsumer.on('error', (err) => {
   console.error(err.message);
 });
  
-queueSub.on('processing_error', (err) => {
+purchaseConsumer.on('processing_error', (err) => {
   console.error(err.message);
 });
- 
-queueSub.start();
+deliveryConsumer.on('processing_error', (err) => {
+  console.error(err.message);
+});
+
+purchaseConsumer.start(); 
+deliveryConsumer.start();
 
 
 module.exports = app;
