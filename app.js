@@ -7,6 +7,7 @@ const AWS = require('./AWS');
 const orderRouter = require('./routes/orderRouter');
 const app = express();
 const sqsConsumer = require('./sqsConsumer');
+require('dotenv').config();
 
 app.use(logger('dev'));
 app.use(express.json());
@@ -54,8 +55,8 @@ function chaoticShipping(payload) {
 }
 
 
-const purchaseQueue = 'https://sqs.us-east-1.amazonaws.com/962378977114/COMPRA-USA'
-const deliveryQueue = 'https://sqs.us-east-1.amazonaws.com/962378977114/SEND_USA';
+const purchaseQueue = process.env.PURCHASE_QUEUE
+const deliveryQueue = process.env.DELIVERY_QUEUE
 const purchaseConsumer = sqsConsumer(purchaseReceiver, purchaseQueue);
 const deliveryConsumer = sqsConsumer(chaoticShipping, deliveryQueue);
 
